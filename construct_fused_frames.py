@@ -56,7 +56,8 @@ from math import pi
 from mpl_toolkits.mplot3d import Axes3D
 
 dirPath = os.getcwd()
-filePath = os.path.join(dirPath,'Startle Dataset','Temp')
+# AC change this name
+filePath = os.path.join(dirPath,'Startle Dataset','Acoustic Data')
 videoWritePath =  os.path.join(dirPath,'Test Data','Video Data')
 sonarRawWritePath =  os.path.join(dirPath,'Test Data','Raw Acoustic Data')
 sonarSubWritePath =  os.path.join(dirPath,'Test Data','Processed Acoustic Data')
@@ -245,10 +246,9 @@ def processData(didsonParams, acousticData, videoFile):
         zSubtracted[zSubtracted<0]=0
 
         #if frames > 1000 and frames < 2000 and frames % 5 == 0: 
-        if True:
-        #if detectMotion(zSubtracted):
+        #if True:
+        if detectMotion(zSubtracted):
             
-
             validFrame, sonarTimeString, videoFrame = getVideoFrame(frame,videoFile,didsonParams)
             
             # If video frame is valid, plot and write sonar data to png
@@ -370,8 +370,8 @@ def getVideoFrame(frame,videoFile,didsonParams):
     position = videoFileBaseName.find("T")
     
     # ONC website says latency would be ~2.5 seconds
-    # 32.5 seconds of latency was determined experimentally
-    vidLatency = datetime.timedelta(seconds=32.5) 
+    # 32 seconds of latency was determined experimentally
+    vidLatency = datetime.timedelta(seconds=32) 
     vidMinute = int(videoFileBaseName[(position+3):(position+5)])
     vidSecond = int(videoFileBaseName[(position+5):(position+7)])
     vidMicrosecond = int(videoFileBaseName[(position+8):(position+10)])*1000
