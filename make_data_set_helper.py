@@ -2,10 +2,10 @@ import os
 import shutil
 from collections import defaultdict
 
-SOURCE_DIR = "all_frames"
-
-SELECTED_DIR = "dataset/selected_frames"
-CONTEXT_DIR = "dataset/context_frames"
+CURRENT_DIR = os.getcwd()
+SOURCE_DIR = os.path.join(CURRENT_DIR,'Test Data', 'Test')
+SELECTED_DIR = os.path.join(CURRENT_DIR,'Test Data', 'Combined Data', 'Selected Frames')
+CONTEXT_DIR = os.path.join(CURRENT_DIR,'Test Data', 'Combined Data', 'Context Frames')
 
 NUM_TARGET_FRAMES = 400
 # there will be this many frames taken from either side 
@@ -67,7 +67,8 @@ def main():
                 # might need to append the key with the video name to make next section easier 
                 context_frames.append(frames[context_key])
 
-
+    print(f"selected list: {selected_frames}")
+    print(f"selected list: {context_frames}")
     # now copy all of the frames from the source dir that are selected into the selected folder
     # and copy all of the frames from the source dir that are cobtext frames into the context folder
     '''
