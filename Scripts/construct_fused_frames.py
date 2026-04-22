@@ -99,7 +99,6 @@ def getFileData(filePath,fileName):
     Config = mat['Config']
     Meta = mat['Meta']
     acousticData = Data['acousticData']
-
     SonarFileBaseName = os.path.basename(fileName)
     position = SonarFileBaseName.find("T")
     #print(SonarFileBaseName[(position+1):(position+3)])
@@ -550,7 +549,6 @@ def combineSonarAndVideo(rawPath, subPath, videoFrame, combinedPath):
     # Given this we will have to convert nothing to RGB
     success = cv2.imwrite(combinedPath, combined)
     return success
-
 
 
 def main():
