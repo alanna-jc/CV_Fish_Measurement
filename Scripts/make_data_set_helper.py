@@ -78,6 +78,7 @@ def main():
                 
                 # crappy IndexError fix
                 if (i + NUM_CONTEXT_FRAMES) >= len(sorted_frames):
+
                     continue
 
                 context_key = sorted_frames[j]
@@ -91,6 +92,7 @@ def main():
     # now copy all of the frames from the source dir that are selected into the selected folder
     # and copy all of the frames from the source dir that are cobtext frames into the context folder
     print("Copying selected frames to folder...")
+
     for frame in selected_frames:
 
         src = os.path.join(SOURCE_DIR, frame)
@@ -106,6 +108,6 @@ def main():
         dst = os.path.join(CONTEXT_DIR, frame)
 
         shutil.copy(src, dst)
-    
+
 if __name__ == "__main__":
     main()
