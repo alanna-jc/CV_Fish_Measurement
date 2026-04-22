@@ -1,3 +1,45 @@
+"""
+Created by Adriel Ngo, edited by Alanna Cunha 2025/11/17
+
+Sonar and Video Data Processing Pipeline
+
+This script processes DIDSON sonar data and corresponding video recordings to create output png files 
+of sonar plot, corresponding video png, and COCO-like JSON
+
+Workflow of the code:
+1. Extract data from .mat sonar files.
+2. Check if the file has already been processed.
+3. Find the corresponding video file recorded for the same hourly interval.
+4. Process sonar data:
+   - Perform background subtraction.
+   - Detect motion in each sonar frame.
+   - Synchronize valid sonar frames with video frames.
+   - Generate polar plots for raw and background-subtracted sonar data.
+   - Save frames and data to PNG images and JSON files.
+5. Repeat for multiple sonar files, up to a specified limit (default: 50 files).
+
+Key Features:
+- Polar plotting of sonar frames with configurable beam and window limits.
+- Motion detection using pixel intensity thresholds and weighted row sums.
+- Synchronization of sonar frames with video frames using timestamps.
+- Automatic creation of required directories and JSON files.
+- Handling of missing or incomplete video data.
+
+Directory Structure:
+- 'Startle Dataset/Acoustic Data': source .mat files
+- 'Test Data/Video Data': saved video frames
+- 'Test Data/Raw Acoustic Data': saved raw sonar images
+- 'Test Data/Processed Acoustic Data': saved background-subtracted sonar images
+- 'Test Data', 'Combined Data': combined image
+
+Resources:
+ - Didson data wiki: https://wiki.oceannetworks.ca/spaces/DP/pages/49447779/119
+
+Usage:
+Run the script directly. The main() function will scan the 'ONC Data' folder, process 
+unprocessed files, and output processed images and JSON files. 
+"""
+
 import numpy as np
 import os
 import glob
@@ -7,21 +49,24 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.colorbar as clr
-from download import downloadFile
+from download_ONC_data import downloadFile
 
 from pymatreader import read_mat
 from math import pi
 from mpl_toolkits.mplot3d import Axes3D
 
 dirPath = os.getcwd()
-filePath = os.path.join(dirPath,'ONC Data')
+# AC change this name
+filePath = os.path.join(dirPath,'Startle Dataset','Acoustic Data')
 videoWritePath =  os.path.join(dirPath,'Test Data','Video Data')
 sonarRawWritePath =  os.path.join(dirPath,'Test Data','Raw Acoustic Data')
 sonarSubWritePath =  os.path.join(dirPath,'Test Data','Processed Acoustic Data')
+combinedWritePath = os.path.join(dirPath, 'Test Data', 'Combined Data')
 cameraCode = 'AXISCAMB8A44F04DEEA_'
 sonarCode = "DIDSON3000SN374_"
 activeCategory = 0
 
+# Helper
 class NumpyArrayEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -33,8 +78,20 @@ class NumpyArrayEncoder(json.JSONEncoder):
         else:
             return super(NumpyArrayEncoder, self).default(obj)
 
+# Step 1
 def getFileData(filePath,fileName):
-    
+    """
+    Extract the data from the .mat file. You can look at the entries directly using matlab
+    You can look at what each entry means on ONC website
+
+    Parameters:
+        didsonParams: sonar paramaters extracted from sonar .mat file
+
+    Returns:
+        didsonParams: the parameters
+        acousticData: the actual data
+
+    """
     # Read mat file
     fullPath = os.path.join(filePath,fileName)
     mat = read_mat(fullPath)
@@ -42,8 +99,11 @@ def getFileData(filePath,fileName):
     Config = mat['Config']
     Meta = mat['Meta']
     acousticData = Data['acousticData']
+    SonarFileBaseName = os.path.basename(fileName)
+    position = SonarFileBaseName.find("T")
+    #print(SonarFileBaseName[(position+1):(position+3)])
 
-    # Get parameters from file
+    # Extract parameters
     didsonParams = { 
         'winStart'          : Config['windowStart'][2],
         'winLength'         : Config['windowLength'][2],
@@ -63,7 +123,7 @@ def getFileData(filePath,fileName):
         'year'              : Data['year'],
         'month'             : Data['month'],
         'day'               : Data['day'],
-        'hour'              : Data['hour'],
+        #'hour'              : Data['hour'], # this was shown to be wrong in the files
         'minute'            : Data['minute'],
         'second'            : Data['second'],
         'Hsecond'           : Data['hsecond'],
@@ -72,17 +132,31 @@ def getFileData(filePath,fileName):
     # Calculated parameters
     didsonParams.update({
         'sampleLength'      : (didsonParams['winLength']/didsonParams['samplesPerBeam']),
-        'hourMedian'        : np.zeros((didsonParams['numBeams'],didsonParams['samplesPerBeam']))})
+        'hourMedian'        : np.zeros((didsonParams['numBeams'],didsonParams['samplesPerBeam'])),
+        'hour'              : int(SonarFileBaseName[(position+1):(position+3)])})
     
     return didsonParams, acousticData
 
+# Step 2
 def alreadyProcessed(didsonParams):
+    """
+    Checks if processed file already exists
+
+    Parameters:
+        didsonParams: sonar paramaters extracted from sonar .mat file
+
+    Returns:
+        Bool: True if already processed, False otherwise
+    
+    """
     # os.chdir(sonarSubWritePath)
     year = didsonParams['year'][0]
     month = didsonParams['month'][0]
     day = didsonParams['day'][0]
-    hour = didsonParams['hour'][0]
+    hour = didsonParams['hour'] # not an array as pulled from file name
+    
     fileSearch = f'{sonarCode}{year}{month:02d}{day:02d}T{hour:02d}'
+    
     fileStr = os.path.join(sonarSubWritePath,f'{fileSearch}*.png')
     files = glob.glob(fileStr)
     if len(files) != 0:
@@ -90,9 +164,55 @@ def alreadyProcessed(didsonParams):
     else:
         return False
 
+# Step 3            
+def getVideoFile(didsonParams):
+    """
+    Gets video file corresponding to sonar data file
+    
+    Video data is recorded for approx. 5 minutes every hour, starting 10 mins after the hour
+    dIDSON data is recorded for approx. 10 minutes every hour, starting 5 mins after the hour
 
-def processData(didsonParams,acousticData):
+    Parameters:
+        didsonParams: sonar paramaters extracted from sonar .mat file
 
+    Returns:
+        videoFile: corresponding video file path string. Returns none if none returned from search
+
+    """
+    videoFile = None
+    
+    # Fetching needed params
+    basePath = (didsonParams['filePath'])
+    #print(basePath)
+    year = didsonParams['year'][0]
+    month = didsonParams['month'][0]
+    day = didsonParams['day'][0]
+    hour = didsonParams['hour'] # not an array as pulled from file name
+    #print(f"hour {hour}")
+    
+    fileSearchPath = f'{cameraCode}{year}{month:02d}{day:02d}T{hour:02d}*.mp4'
+    #print(f'File search path {fileSearchPath}')
+
+    for file in glob.glob(os.path.join(basePath, fileSearchPath)):
+        #print(f'file {file}')
+        videoFile = file
+        
+    return videoFile
+
+# Step 4
+def processData(didsonParams, acousticData, videoFile):
+    """
+    Created background subtration. Detects motion. If motion detected processes sonar and video at that time.
+
+    Parameters:
+        didsonParams: sonar paramaters extracted from sonar .mat file
+        acousticData: the sonar data
+        videoFile: string to video file location
+
+    Returns:
+        None
+
+    """
     orgTitle = 'Original'
     orgCmap = 'Raw Backscatter Amplitude'
     subTitle = 'Background Subtracted'
@@ -100,11 +220,11 @@ def processData(didsonParams,acousticData):
     rawDidsonData = []
     subDidsonData = []
 
-    # Calculate hourly median
+    # Background subtration prep: Calculate hourly median and create background subtractor
     subtractBgData = np.zeros(np.shape(acousticData))
     hourMedian = np.median(acousticData,axis=(2))
-    for frames in np.arange(didsonParams['numFrames']):
-            subtractBgData[:,:,frames] = np.subtract(acousticData[:,:,frames],hourMedian)
+    for frame in np.arange(didsonParams['numFrames']):
+            subtractBgData[:,:,frame] = np.subtract(acousticData[:,:,frame],hourMedian)
 
     # Set range for polar plot
     range = np.linspace(didsonParams['winStart'],didsonParams['winLength']+didsonParams['winStart'],didsonParams['samplesPerBeam'])
@@ -113,66 +233,115 @@ def processData(didsonParams,acousticData):
     # Define data
     r,th = np.meshgrid(range,azm)
 
-    # Get corresponding video file
-    videoFile = getVideoFile(didsonParams)
-    if videoFile == None:
-        print(f'Video file not found')
-        return
+    # Frames processed count
+    processedFrames = 0
 
     # Loop through all sonar frames
-    for frames in np.arange(didsonParams['numFrames']): 
+    for frame in np.arange(didsonParams['numFrames']): 
 
-        zOriginal = acousticData[:,:,frames]
+        zOriginal = acousticData[:,:,frame]
         zOriginal[zOriginal<0]=0
-        zSubtracted = subtractBgData[:,:,frames]
+        zSubtracted = subtractBgData[:,:,frame]
         zSubtracted[zSubtracted<0]=0
 
         #if frames > 1000 and frames < 2000 and frames % 5 == 0: 
-        if detectMotion(zSubtracted) == True:
+        if True:
+        #if detectMotion(zSubtracted):
             
-            validFrame, sonarTimeString, videoFrame = getVideoFrame(frames,videoFile,didsonParams)
+            validFrame, sonarTimeString, videoFrame = getVideoFrame(frame,videoFile,didsonParams)
             
             # If video frame is valid, plot and write sonar data to png
             if(validFrame == True):
-                print(f'Processing frame {frames}')
-                sonarRawImgPath = os.path.join(sonarRawWritePath,f'{sonarCode}{sonarTimeString}.png')
-                sonarSubImgPath = os.path.join(sonarSubWritePath,f'{sonarCode}{sonarTimeString}_BGS.png')
 
-                plotPolarFigure(1,th,r,zOriginal,orgTitle,orgCmap,didsonParams,frames,sonarRawImgPath)
-                plotPolarFigure(1,th,r,zSubtracted,subTitle,subCmap,didsonParams,frames,sonarSubImgPath)
+                processedFrames += 1
+                print(f'Processing valid frame {processedFrames}')
+
+                shortSonarTimeString = sonarTimeString[0:11]
+
+                sonarRawImgPath = os.path.join(sonarRawWritePath,f'{shortSonarTimeString}.Frame_{processedFrames}.png')
+                sonarSubImgPath = os.path.join(sonarSubWritePath,f'{sonarCode}{sonarTimeString}_BGS.png')
+                combinedPath = os.path.join(combinedWritePath, f'{shortSonarTimeString}.Frame_{processedFrames}.png')
+
+                sonarBeamToImage(zOriginal, r, th, didsonParams, sonarRawImgPath)
+                sonarBeamToImage(zSubtracted, r, th, didsonParams, sonarSubImgPath)
+                
+                #plotPolarFigure(1,th,r,zOriginal,orgTitle,orgCmap,didsonParams,frame,sonarRawImgPath)
+                #plotPolarFigure(1,th,r,zSubtracted,subTitle,subCmap,didsonParams,frame,sonarSubImgPath)
                 
                 rawDidsonData = zOriginal
                 subDidsonData = zSubtracted
 
                 updateJson(rawDidsonData, subDidsonData, videoFrame, sonarTimeString)
                 
-
-# Video data is recorded for approx. 5 minutes every hour, starting 10 mins after the hour
-# DIDSON data is recorded for approx. 10 minutes every hour, starting 5 mins after the hour
-# Expects: Single .mp4 file corresponding to the same hour interval as the SONAR data
-# Returns: file name
-def getVideoFile(didsonParams):
+                success = combineSonarAndVideo(sonarRawImgPath, sonarSubImgPath, videoFrame, combinedPath)
+                print(f'Combined sonar data made = {success}')
+                
+    return processedFrames            
     
-    videoFile = None
-    cameraCode = 'AXISCAMB8A44F04DEEA_'
-    os.chdir(didsonParams['filePath'])
-    year = didsonParams['year'][0]
-    month = didsonParams['month'][0]
-    day = didsonParams['day'][0]
-    hour = didsonParams['hour'][0]
-    fileSearch = f'{cameraCode}{year}{month:02d}{day:02d}T{hour:02d}'
-    fileStr = f'{fileSearch}*.mp4'
-    for file in glob.glob(fileStr):
-        videoFile = file
-    return videoFile
 
-# Synchronizes video data with sonar data and saves video frame as png
-# frame time in format: 'YYYYmmddTHHMMSS.FFFZ'
-def getVideoFrame(frames,videoFile,didsonParams):
+# Step 4 Helper 1
+def detectMotion(z):
+    """
+    Detects whether an object is present in a 2D data array.
+
+    The function counts pixels above a threshold (30% of expected max) and evaluates
+    weighted row sums to determine if an object is present. If enough pixels exceed 
+    the threshold and any row's weighted sum passes the limit, the function returns True;
+    otherwise, it returns False.
+
+    Returns:
+        bool: True if an object is detected, False otherwise.
+    """
+    thresh = 200*0.3       #Threshold is 30% of expected max
+    pixels = (z>thresh).sum()
+    maxRows = len(z[0])
+
+    if pixels > 17:
+        rowIdx = 0
+
+        # For each radius value
+        for rows in z.transpose():
+            weight = rowIdx/maxRows
+            rowWeight = weight * rows.sum()
+            rowIdx += 1 
+            # making this not sensitive enough will result in fish frames being missed especially if fish is diagonal
+            if(rowWeight>350): 
+                print( "Motion Detected")
+                objectDetected = True
+                break   
+            else:   
+                objectDetected = False
+              
+    else:
+        objectDetected = False
     
-    # Note: video filename timestamp is accurate
-    #       didson filename timestamp is not accurate (includes latency of data retrieval)
-    #       didson 'frameTime' attribute is always accurate
+    return objectDetected
+
+# Step 4 Helper 2
+def getVideoFrame(frame,videoFile,didsonParams):
+    """
+    Synchronizes video data with sonar data and saves video frame as png
+    frame time in format: 'YYYYmmddTHHMMSS.FFFZ'
+    
+    NOTE 1:
+    - Video data is recorded for approx. 5 minutes every hour, starting 10 mins after the hour
+    - DIDSON data is recorded for approx. 10 minutes every hour, starting 5 mins after the hour
+
+    NOTE 2:
+    - video filename timestamp IS accurate
+    - didson filename timestamp is NOT accurate (includes latency of data retrieval)
+    - didson 'frameTime' attribute is ALWAYS accurate
+
+    Parameters:
+        frame: frame to get
+        videoFile: string of video file location
+        didsonParams: sonar paramaters extracted from sonar .mat file
+
+    Returns:
+        validFrame: Is there a frame here
+        sonarTimeString: what time we at
+        videoFrame: the video frame returned 
+    """
 
     # Open video
     video = cv2.VideoCapture(videoFile)
@@ -183,40 +352,58 @@ def getVideoFrame(frames,videoFile,didsonParams):
     year = didsonParams['year'][0]
     month = didsonParams['month'][0]
     day = didsonParams['day'][0]
-    hour = didsonParams['hour'][0]
+    hour = didsonParams['hour'] # not an array as pulled from file name
 
     # Synchronized instrument time at desired frame
-    sonarMinute = didsonParams['minute'][frames]
-    sonarSecond = didsonParams['second'][frames]
-    sonarMillisecond = didsonParams['Hsecond'][frames]
-    # AC change , H second is hundreth of a second to * by 10 to get ms
-    sonarTime = datetime.datetime(year,month,day,hour,sonarMinute,sonarSecond,sonarMillisecond*10)
+    sonarMinute = didsonParams['minute'][frame]
+    sonarSecond = didsonParams['second'][frame]
+    # not a milli but i think still correct outcome
+    sonarMillisecond = didsonParams['Hsecond'][frame] 
+    
+    sonarTime = datetime.datetime(year,month,day,hour,sonarMinute,sonarSecond,sonarMillisecond)
     sonarTimeString = sonarTime.strftime("%Y%m%dT%H%M%S.%f")[:-3]
     sonarTimeString += 'Z'
     
     # Time at start of video (taken from file name)
-    vidLatency = datetime.timedelta(seconds=2.5)
-    vidMinute = int(videoFile[31:33])
-    vidSecond = int(videoFile[33:35])
-    vidMicrosecond = int(videoFile[36:39])*1000
+    videoFileBaseName = os.path.basename(videoFile)
+    position = videoFileBaseName.find("T")
+    
+    # ONC website says latency would be ~2.5 seconds
+    # 32 seconds of latency was determined experimentally
+    vidLatency = datetime.timedelta(seconds=32) 
+    vidMinute = int(videoFileBaseName[(position+3):(position+5)])
+    vidSecond = int(videoFileBaseName[(position+5):(position+7)])
+    vidMicrosecond = int(videoFileBaseName[(position+8):(position+10)])*1000
     vidTime = datetime.datetime(year,month,day,hour,vidMinute,vidSecond,vidMicrosecond)
+    
+    """ Checking Print statement """
+    print(f'Video file name: {videoFileBaseName}. Video time: {vidTime}. Sonar time: {sonarTime}')
+    
+    # due to arrival time being different (network latency stuff
     vidTimeCorrected = vidTime - vidLatency
+    
     # Ignore sonar frames that occur before video starts
-    if(sonarTime < vidTime):
+    if(sonarTime < vidTimeCorrected):
+        print("Sonar frame occured before video starts")
         validFrame = False
     else:
         # Calculate video frame number using elapsed time
         deltaT = sonarTime - vidTimeCorrected
-        vidFrame = deltaT.total_seconds()*fps
-        thisVidTime = vidTimeCorrected + deltaT
-        vidTimeString = thisVidTime.strftime("%Y%m%dT%H%M%S.%f")[:-3]
-        vidTimeString += 'Z'
+        #print(f'Delta T = {deltaT} = sonartTime {sonarTime} - vidTimeCorrected {vidTimeCorrected}')
 
+        vidFrame = deltaT.total_seconds()*fps
+
+        #This is the line that actually pulls the frame 
+        #print(f"vidFrame: {vidFrame}")
         video.set(cv2.CAP_PROP_POS_FRAMES,vidFrame)
         ret, videoFrame = video.read()
 
         # If frame is valid, write to png
         if ret == True:
+
+            thisVidTime = vidTime + deltaT
+            vidTimeString = thisVidTime.strftime("%Y%m%dT%H%M%S.%f")[:-3]
+            vidTimeString += 'Z'
             #videoFrame = cv2.resize(frame, (400, 300), fx = 0, fy = 0,
             #                    interpolation = cv2.INTER_CUBIC)
 
@@ -228,89 +415,79 @@ def getVideoFrame(frames,videoFile,didsonParams):
             validFrame = True
         else:
             validFrame = False
+            print("Video Finished")
 
     video.release()
+    
     return validFrame, sonarTimeString, videoFrame
 
-# Create polar plots and write as png
-def plotPolarFigure(figIdx,th,r,z,title,cbarLabel,didsonParams,frames,sonarFullPath):
 
-    beamLim = [didsonParams['beamStart'],didsonParams['beamEnd']]
-    winLim = [didsonParams['winStart'],didsonParams['winStart']+didsonParams['winLength']]
+# Step 4 Helper 3
+# AC to add description
+def sonarBeamToImage(z, r, th, didsonParams, sonarFullPath):
+    """
 
-    fig = plt.figure(figIdx)
-    ax = Axes3D(fig)
-    ax = fig.add_subplot(projection='polar')
-    plot = ax.contourf(th,r,z,50)
-    ax.grid()
-    ax.set_thetamin(np.rad2deg(beamLim[0])-10)
-    ax.set_thetamax(np.rad2deg(beamLim[1])+10)
-    ax.set_theta_offset(pi/2)
-    ax.set_ylim(winLim)
-    ax.set_ylabel('Range [m]')
-    ax.set_title(title)
-    ax.set_rticks(np.linspace(winLim[0],winLim[1],11,dtype=int))
-    # textstr =  "\n".join([
-    #      f'Location: {location}, Device: {deviceName}',
-    #      f'Synchronized Instrument Time: {frameTime}',
-    #      f'Frame Index: {frames} of {numFrames}',])
-    # props = dict(boxstyle='round', facecolor='white', alpha=0.5)
+    """
+    
+    # matlab code from ONC: 
+    # rangeToBinStart = linspace(Config.windowStart(2), Config.windowLength(2) + Config.windowStart(2), size(Data.acousticData,2));
+    rangeToBinStart = np.linspace(didsonParams['winStart'], didsonParams['winLength'] + didsonParams['winStart'], z.shape[1])    
+                                    
+    # matlab code from ONC:                         
+    # theta = ANGLEAMP*linspace(-14*(2*pi)/360,14*2*pi/360,size(Data.acousticData,1));
+    # ignore angle amp .we working with REAL numbers hear      
+    theta = np.linspace(-14*(2*np.pi)/360, 14*2*np.pi/360, z.shape[0])
 
-    # # place a text box in upper left in axes coords
-    # ax.text(0.05, 1.4, textstr, transform=ax.transAxes, fontsize=10,
-    #         verticalalignment='top', bbox=props)
-    # ax.text(0,-0.1,
-    #     f'{fileName}',
-    #     fontsize = 6,
-    #     horizontalalignment='left',
-    #     verticalalignment='center',
-    #     transform=ax.transAxes)
-    #fig.subplots_adjust(top=0.7,bottom=0.1,left=-1.0,right=1.0,hspace=0,wspace=0)
-    cax,_ = clr.make_axes(ax,shrink=0.8)
-    cbar = fig.colorbar(plot,cax=cax)
-    cbar.ax.set_ylabel(cbarLabel,fontsize = 8)
-    fig.tight_layout
+    # meshgrid: r along first axis, theta along second
+    r, th = np.meshgrid(rangeToBinStart, theta, indexing='ij')  # use indexing='ij' to match z
 
-    # plt.show()
-    # cv2.waitKey(0)
+    fig, ax = plt.subplots(
+                            figsize=(4, 3),              # 4×3 inches
+                            dpi=100,                     # 100 dpi → 400×300 pixels
+                            subplot_kw={'projection': 'polar'}
+                        )                   
 
-    # Write plot to png
-    plt.savefig(sonarFullPath)
+    # black background
+    fig.patch.set_facecolor('black')
+    ax.set_facecolor('black') 
 
-    # Clumsy fix to resize in pixel values
-    image = cv2.imread(sonarFullPath)
-    image = cv2.resize(image,(400,300),interpolation = cv2.INTER_CUBIC)
-    #cv2.imshow('Image',image)
-    #cv2.waitKey(0)
-    cv2.imwrite(sonarFullPath,image)
 
+    ax.set_theta_zero_location('N')
+    plot = ax.contourf(th.T, r.T, z, 50)   
+    ax.axis('off')
+    
+    # makes it so that full circle is not drawn
+    ax.set_thetamin(-14)
+    ax.set_thetamax(14)
+    
+    fig.tight_layout(pad=0)
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    ax.set_aspect('equal')
+    
+    fig.savefig(sonarFullPath, pad_inches=0)
     plt.close("all")
 
-def detectMotion(z):
-    thresh = 200*0.3           #Threshold is 30% of expected max
-    pixels = (z>thresh).sum()
-    maxRows = len(z[0])
+    return
 
-    if pixels > 20:
-        rowIdx = 0
-
-        # For each radius value
-        for rows in z.transpose():
-            weight = rowIdx/maxRows
-            rowWeight = weight * rows.sum()
-            rowIdx += 1 
-            if(rowWeight>600):
-                objectDetected = True
-                break   
-            else:   
-                objectDetected = False
-              
-    else:
-        objectDetected = False
-    
-    return objectDetected
-
+# Step 4 Helper 4
 def updateJson(rawData,subData,videoFrame,sonarTimeString):
+    """
+    Updates or creates JSON files for sonar and video data in COCO-like format.
+
+    The function ensures that JSON files exist for raw sonar data, background-subtracted 
+    sonar data, and video frames. If a file does not exist, it is initialized with a 
+    creation timestamp. The function then writes the provided data under the key 
+    'images' -> 'raw_data', using a custom encoder to handle NumPy arrays.
+
+    Parameters:
+        rawData (array-like): Raw sonar data to save in JSON.
+        subData (array-like): Background-subtracted sonar data to save in JSON.
+        videoFrame (array-like): Corresponding video frame data.
+        sonarTimeString (str): Timestamp string used to name the JSON files.
+
+    Returns:
+        None
+    """
     
     sonarRawJsonPath = os.path.join(sonarRawWritePath,f'{sonarCode}{sonarTimeString}_RawData.json')
     sonarSubJsonPath = os.path.join(sonarSubWritePath,f'{sonarCode}{sonarTimeString}_BGS_RawData.json')
@@ -345,6 +522,35 @@ def updateJson(rawData,subData,videoFrame,sonarTimeString):
     except Exception as e:
         print(e)
 
+def combineSonarAndVideo(rawPath, subPath, videoFrame, combinedPath):
+    """
+    Combines two saved sonar images with a video frame side by side and saves the combined image.
+
+    Parameters:
+        rawPath (str): path to raw sonar image
+        subPath (str): path to background-subtracted sonar image
+        videoFrame (np.array): video frame (BGR)
+        combinedPath (str): path to save the combined image
+        targetHeight (int): height to resize all images to (maintains aspect ratio)
+    """
+
+    # Load sonar images
+    rawImg = cv2.imread(rawPath)
+    subImg = cv2.imread(subPath)
+
+    # Resize video frame to be same height as sonar images
+    videoFrame = cv2.resize(videoFrame, (533, 300), interpolation=cv2.INTER_AREA)
+
+    # Concatenate images horizontally
+    combined = np.hstack([rawImg, subImg, videoFrame])
+
+    # CV2 hates you and me and outputs things as BGR and its hard to tell
+    # imwrite will expect BGR inputs and will flip it to rgb when it saves it
+    # Given this we will have to convert nothing to RGB
+    success = cv2.imwrite(combinedPath, combined)
+    return success
+
+
 def main():
 
     # Create directories to write images to if they do not exist
@@ -356,38 +562,58 @@ def main():
     except OSError as error:
         print("Error creating directory")
 
-    # Open ONC Data folder & process each .mat file in it
+    # Get that Sonar data
     sonarData = sorted(glob.glob(os.path.join(filePath,'*.mat')))
-    
-    # Set how many files to process
-    processedFiles = 1
 
-    # Keep track of how many files we've seen
-    allFiles = 1
+    # Total files in sonar data
+    numFiles = len(sonarData)
+    # Current File tracker
+    currentFile = 0
+    # Count numfiles processed
+    processedFiles = 0
+    # Count frames processed
+    totalFramesProcessed = 0
 
-    if len(sonarData) == 0:
+    if numFiles == 0:
         print('No files to process')
-        processedFiles = 0
+        
     else:
-        while processedFiles <= 50 and processedFiles <= len(sonarData):
-            for files in sonarData:
-                numFiles = len(sonarData)
-                print(f'Checking file {allFiles} of {numFiles}')
-                didsonParams, acousticData = getFileData(filePath,files)
-                    
-                # Check for corresponding data in the dataset before processing
-                if(alreadyProcessed(didsonParams) == False):
+        print(f'Found {numFiles} file(s)')
+            
+        for files in sonarData:
+            
+            currentFile += 1
+            print(f'Checking file {currentFile} of {numFiles}')
+            #print(files)
+            
+            # Collecting the data from the sonar file
+            didsonParams, acousticData = getFileData(filePath,files)
+                
+            # Check for corresponding data in the dataset before processing
+            if(alreadyProcessed(didsonParams) == False):
+                print(f'Processing file : {files}')
+                
+                # Get corresponding video file
+                videoFile = getVideoFile(didsonParams)
+                
+                if videoFile == None:
+                    print(f'Video file not found. Skipping Processsing')
+                    continue
+            
+                # Process this file
+                totalFramesProcessed += processData(didsonParams, acousticData, videoFile)
+                
+                processedFiles += 1
+                
+            else:
+                print('File already processed, skipping processing')
+                
+        print(f'{processedFiles} file(s) of {currentFile} scanned. Number of frames processed: {totalFramesProcessed}')
 
-                    print(f'Processing file : {files}')
-                    processData(didsonParams,acousticData)
-                    processedFiles += 1
-
-                allFiles += 1
-
-    print(f'Finished processing {processedFiles-1} files')
     # files = 'BarkleyCanyon_BarkleyNode_MultibeamNon-rotatingSonar_20220901T110500.708Z_20220901T112000.000Z.mat'
     # didsonParams, acousticData = getFileData(filePath,files)
     # processData(didsonParams,acousticData)
 
 if __name__ == '__main__':
-     main()
+    main()
+
