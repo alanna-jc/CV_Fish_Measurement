@@ -8,11 +8,8 @@ import errno
 import math
 
 url = 'https://data.oceannetworks.ca/api/dataProductDelivery'
-<<<<<<< HEAD
 token = '0d6776bd-e174-4817-931b-a7bdd5de2514'      # Alanna Token                            
-=======
-token = 'aaf56230-d4da-4c5a-9023-4358410f97bb'                                  
->>>>>>> 205f635b9fc7bbc1c956c853cd4da77cb3cbf735
+
 requestParameters = {'method':'request',
             'token':token,                              # replace YOUR_TOKEN_HERE with your personal token obtained from the 'Web Services API' tab at https://data.oceannetworks.ca/Profile when logged in.
             }
@@ -21,14 +18,11 @@ downloadFolder = os.path.join("Startle Dataset","Acoustic Data")                
 def downloadFile(type,dateFrom,dateTo):
     setRequestParameters(type,dateFrom,dateTo)
     requestId = requestDataProduct(requestParameters)
-<<<<<<< HEAD
     
     # AC add
     if requestId == None:
         print('User aborted download')
         return
-=======
->>>>>>> 205f635b9fc7bbc1c956c853cd4da77cb3cbf735
 
     for runId in runDataProduct(requestId):
         indx = 1    #Index Number of file to download.
@@ -72,15 +66,13 @@ def requestDataProduct(parameters):
             print('File Count: {}'.format(requestInfo['numFiles']))     # Print the Estimated File Size
         if ('fileSize' in requestInfo.keys()):
             print('File Size: {}'.format(requestInfo['fileSize']))      # Print the Estimated File Size
-<<<<<<< HEAD
             
             # AC add
             print('Would you still like to proceed with download?')
             answer = input("Y/N: ")
             if answer == 'N':
                 return None
-=======
->>>>>>> 205f635b9fc7bbc1c956c853cd4da77cb3cbf735
+
         if 'downloadTimes' in requestInfo.keys():
             print('Estimated download time:')
             for e in sorted(requestInfo['downloadTimes'].items(),key=lambda t: t[1]):
@@ -349,7 +341,6 @@ def printErrorMesasge(response,
     
 def main():
     
-<<<<<<< HEAD
     # previous value 
     # datefrom = '2022-08-20T09:00:00.000Z'
     # dateto = '2022-08-22T10:00:00.000Z'
@@ -374,13 +365,7 @@ def main():
 
     downloadFile('SONAR',datefrom,dateto)
     downloadFile('VIDEOCAM',datefrom,dateto)
-=======
-    datefrom = '2022-10-12T09:00:00.000Z'
-    dateto = '2022-10-12T10:00:00.000Z'
 
-    downloadFile('SONAR',datefrom,dateto)
-    #downloadFile('VIDEOCAM',datefrom,dateto)
->>>>>>> 205f635b9fc7bbc1c956c853cd4da77cb3cbf735
 
 if __name__ == '__main__':
      main()
