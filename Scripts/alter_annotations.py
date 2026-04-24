@@ -1,4 +1,7 @@
-# TODO, add description
+"""
+The annotations are done on a composite image. This script moves those annotations over and finds the original unaltered sonar frame associated with it.
+
+"""
 
 
 # imports
@@ -121,6 +124,20 @@ def write_yolo_annotations(filepath, bounding_boxes):
 
 def main():
     
+    to_alter = 0
+    # i need this script to work for my data without fish, which is already separated, so no worry there
+    answer = input("Do the labels need altering? (yes/no): ").strip().lower()
+
+    if answer in ['yes', 'y']:
+        to_alter = 1
+        print('Altering labels...')
+    elif answer in ['no', 'n']:
+        to_alter = 0
+        print('Not altering labels...')
+    elif answer not in ['yes', 'no', 'y', 'n']:
+        print("Invalid input. Please run the program again and type 'yes' or 'no' (or 'y' or 'n').")
+        return
+    
     # create if does not exist file paths
     # the other file paths must already exist to have files in them
     print('Starting conversions')
@@ -171,15 +188,14 @@ def main():
         
         # TODO: change so that this runs if there is an input on start
         
-        # read yolo annotations
-        annotation = read_yolo_annotations(file)
-        # modify yolo annotations
-        new_annotation = modify_yolo_annotations(old_image_shape, shape, annotation)
-        # write yolo annotations
-        write_yolo_annotations(file, new_annotation)
+        if to_alter == 1:
+            # read yolo annotations
+            annotation = read_yolo_annotations(file)
+            # modify yolo annotations
+            new_annotation = modify_yolo_annotations(old_image_shape, shape, annotation)
+            # write yolo annotations
+            write_yolo_annotations(file, new_annotation)
         
-        # TODO add some sort of success check and print ??
-    
     print('Alterations complete')
 
     
