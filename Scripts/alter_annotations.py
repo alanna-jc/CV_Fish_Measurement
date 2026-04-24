@@ -1,3 +1,6 @@
+# TODO, add description
+
+
 # imports
 import os
 import cv2
@@ -10,7 +13,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # project root
 project_root = os.path.dirname(script_dir)
 
-label_filepath = os.path.join(project_root, 'Model', 'dataset', 'labels')
+label_filepath = os.path.join(project_root, 'no fish (copy)')
 src_new_img_filepath = os.path.join(project_root, 'Scripts', 'Test Data', 'Raw Acoustic Data')
 dst_new_img_filepath = os.path.join(project_root, 'Model', 'dataset', 'images')
 
@@ -165,6 +168,8 @@ def main():
         
         if not success:
             raise AssertionError(f"could not write {expected_png_filename} to new directory")
+        
+        # TODO: change so that this runs if there is an input on start
         
         # read yolo annotations
         annotation = read_yolo_annotations(file)

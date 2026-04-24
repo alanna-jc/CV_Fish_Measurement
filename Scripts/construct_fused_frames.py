@@ -122,8 +122,9 @@ def getFileData(filePath,fileName):
         'citation'          : Meta['citation'],
         'year'              : Data['year'],
         'month'             : Data['month'],
+        # AC temp hard code as ONC mat files have been wrong
         'day'               : Data['day'],
-        #'hour'              : Data['hour'], # this was shown to be wrong in the files
+        'hour'              : Data['hour'], # this was shown to be wrong in the files
         'minute'            : Data['minute'],
         'second'            : Data['second'],
         'Hsecond'           : Data['hsecond'],
@@ -133,7 +134,8 @@ def getFileData(filePath,fileName):
     didsonParams.update({
         'sampleLength'      : (didsonParams['winLength']/didsonParams['samplesPerBeam']),
         'hourMedian'        : np.zeros((didsonParams['numBeams'],didsonParams['samplesPerBeam'])),
-        'hour'              : int(SonarFileBaseName[(position+1):(position+3)])})
+        'hour'              : int(SonarFileBaseName[(position+1):(position+3)])}),
+        #'day'               : 21 })
     
     return didsonParams, acousticData
 
@@ -152,6 +154,8 @@ def alreadyProcessed(didsonParams):
     # os.chdir(sonarSubWritePath)
     year = didsonParams['year'][0]
     month = didsonParams['month'][0]
+    # AC temp
+    #day = didsonParams['day']
     day = didsonParams['day'][0]
     hour = didsonParams['hour'] # not an array as pulled from file name
     
@@ -186,6 +190,8 @@ def getVideoFile(didsonParams):
     #print(basePath)
     year = didsonParams['year'][0]
     month = didsonParams['month'][0]
+    # AC temp
+    #day = didsonParams['day']
     day = didsonParams['day'][0]
     hour = didsonParams['hour'] # not an array as pulled from file name
     #print(f"hour {hour}")
@@ -351,6 +357,8 @@ def getVideoFrame(frame,videoFile,didsonParams):
 
     year = didsonParams['year'][0]
     month = didsonParams['month'][0]
+    # AC temp
+    # day = didsonParams['day']
     day = didsonParams['day'][0]
     hour = didsonParams['hour'] # not an array as pulled from file name
 
