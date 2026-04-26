@@ -1,0 +1,11 @@
+# root dir relative to training python script
+path: ./dataset  
+
+# Where the images are, it will auto replace with 'labels'?
+train: images/train  
+val: images/val    
+test: images/test  
+
+# Classes
+names:
+  0: fish
