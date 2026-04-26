@@ -6,16 +6,19 @@ The motivation is to track the health of sablefish population.
 
 ## Repo Structure
 ### Model
+**yolo_model.py**
+
+Trains data using YOLO pretrained model and outputs predictions using best found model
 
 ### Scripts
-1. **download_ONC_data**
+**download_ONC_data** (Step 1)
 
 Downloads sonar and video files from ONC data base using Alanna token.
 
 [insert table of what is downloaded]
 
 
-2. **contruct_fused_frames.py**
+**contruct_fused_frames.py** (Step 2)
 
 Creates PNG of .mat sonar code
 
@@ -34,12 +37,12 @@ And combines them all into one image for annotation
 [insert image of that]
 
 
-3.**make_data_set_helper.py**
+**make_data_set_helper.py** (Step 3)
 
 Toy script to extract a specified amount of constructed frames along with some context frames, to help form the dataset. 
 
 
-4.**alter_annotations.py**
+**alter_annotations.py** (Step 4)
 
 Annotations are done on Background subtracted section of combined image. After annotation, this script finds the corresponding original sonar image to the annotated one, and adjust bounding boxes.
 
