@@ -11,14 +11,14 @@ The motivation is to track the health of sablefish population.
 Trains data using YOLO pretrained model and outputs predictions using best found model
 
 ### Scripts
-**download_ONC_data** (Step 1) (Made by Declan)
+**download_ONC_data** (Step 1) [Made by Declan]
 
 Downloads sonar and video files from ONC data base using Alanna token.
 
 [insert table of what is downloaded]
 
 
-**contruct_fused_frames.py** (Step 2) (Draft by Adriel, Edited by Alanna)
+**contruct_fused_frames.py** (Step 2) [Draft by Adriel, Edited by Alanna]
 
 Creates PNG of .mat sonar code
 
