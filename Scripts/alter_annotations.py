@@ -165,14 +165,14 @@ def main():
 
     # Loop through each file
     for file in txt_files:
-    
+        
         txt_filename = os.path.basename(file)
         txt_basename, _ = os.path.splitext(txt_filename)
         expected_png_filename = f"{txt_basename}.png"
         img_path = os.path.join(src_new_img_filepath, expected_png_filename)
         
         if not os.path.exists(img_path):
-            print(f"Missing sonar image for {expected_png_filename}. Skipping")
+            print(f"Missing sonar image for {img_path}. Skipping")
             continue 
         
         # get image shape
@@ -180,13 +180,12 @@ def main():
         shape = img.shape
         
         # save image to correct place
+        # TODO add check if image already there? ir dies cv2.imwrite do for
         img_new_path = os.path.join(dst_new_img_filepath, expected_png_filename)
         success = cv2.imwrite(img_new_path, img)
         
         if not success:
             raise AssertionError(f"could not write {expected_png_filename} to new directory")
-        
-        # TODO: change so that this runs if there is an input on start
         
         if to_alter == 1:
             # read yolo annotations

@@ -135,7 +135,7 @@ def getFileData(filePath,fileName):
         'sampleLength'      : (didsonParams['winLength']/didsonParams['samplesPerBeam']),
         'hourMedian'        : np.zeros((didsonParams['numBeams'],didsonParams['samplesPerBeam'])),
         'hour'              : int(SonarFileBaseName[(position+1):(position+3)])}),
-        #'day'               : 21 })
+        # 'day'               : 21 })
     
     return didsonParams, acousticData
 
@@ -227,10 +227,13 @@ def processData(didsonParams, acousticData, videoFile):
     subDidsonData = []
 
     # Background subtration prep: Calculate hourly median and create background subtractor
+    # AC temp
+    '''
     subtractBgData = np.zeros(np.shape(acousticData))
     hourMedian = np.median(acousticData,axis=(2))
     for frame in np.arange(didsonParams['numFrames']):
             subtractBgData[:,:,frame] = np.subtract(acousticData[:,:,frame],hourMedian)
+    '''
 
     # Set range for polar plot
     range = np.linspace(didsonParams['winStart'],didsonParams['winLength']+didsonParams['winStart'],didsonParams['samplesPerBeam'])
@@ -247,8 +250,9 @@ def processData(didsonParams, acousticData, videoFile):
 
         zOriginal = acousticData[:,:,frame]
         zOriginal[zOriginal<0]=0
-        zSubtracted = subtractBgData[:,:,frame]
-        zSubtracted[zSubtracted<0]=0
+        # AC temp
+        #zSubtracted = subtractBgData[:,:,frame]
+        #zSubtracted[zSubtracted<0]=0
 
         #if frames > 1000 and frames < 2000 and frames % 5 == 0: 
         if True:
@@ -269,6 +273,8 @@ def processData(didsonParams, acousticData, videoFile):
                 combinedPath = os.path.join(combinedWritePath, f'{shortSonarTimeString}.Frame_{processedFrames}.png')
 
                 sonarBeamToImage(zOriginal, r, th, didsonParams, sonarRawImgPath)
+                # AC TEMP
+                '''
                 sonarBeamToImage(zSubtracted, r, th, didsonParams, sonarSubImgPath)
                 
                 #plotPolarFigure(1,th,r,zOriginal,orgTitle,orgCmap,didsonParams,frame,sonarRawImgPath)
@@ -281,6 +287,7 @@ def processData(didsonParams, acousticData, videoFile):
                 
                 success = combineSonarAndVideo(sonarRawImgPath, sonarSubImgPath, videoFrame, combinedPath)
                 print(f'Combined sonar data made = {success}')
+                '''
                 
     return processedFrames            
     
@@ -358,7 +365,7 @@ def getVideoFrame(frame,videoFile,didsonParams):
     year = didsonParams['year'][0]
     month = didsonParams['month'][0]
     # AC temp
-    # day = didsonParams['day']
+    #day = didsonParams['day']
     day = didsonParams['day'][0]
     hour = didsonParams['hour'] # not an array as pulled from file name
 
