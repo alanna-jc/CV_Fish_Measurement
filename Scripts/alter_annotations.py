@@ -16,9 +16,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # project root
 project_root = os.path.dirname(script_dir)
 
-label_filepath = os.path.join(project_root, 'no fish (copy)')
-src_new_img_filepath = os.path.join(project_root, 'Scripts', 'Test Data', 'Raw Acoustic Data')
-dst_new_img_filepath = os.path.join(project_root, 'Model', 'dataset', 'images')
+label_filepath = os.path.join(project_root, 'Model', 'dataset', 'labels', 'val')
+src_new_img_filepath = os.path.join(project_root, 'Scripts', 'Test Data', 'Processed Acoustic Data')
+dst_new_img_filepath = os.path.join(project_root, 'Model', 'dataset', 'images', 'val')
 
 # hardcoded oops
 # tuple of (height, width, channels)
