@@ -8,7 +8,20 @@ The motivation is to track the health of sablefish population.
 ### Model
 **yolo_model.py**
 
-Trains data using YOLO pretrained model and outputs predictions using best found model
+Trains data using YOLOv11 and outputs predictions using best found model
+
+### Program
+**construct_frames.py**
+
+Contains functions for creation of background subtracted frames
+
+**bbox_and_track.py**
+
+Tracks bbox of fish to find longest length. Stores longest length in CVS file. 
+
+**main.py**
+
+Runs full pipeline that creates constructed image, runs AI detection on, tracks fish, finds length, reports.
 
 ### Scripts
 **download_ONC_data** (Step 1) [Made by Declan]
