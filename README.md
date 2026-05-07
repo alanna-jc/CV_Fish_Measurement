@@ -4,6 +4,11 @@ Using sonar data from Ocean Networks Canada (ONC), develop a model that can dete
 
 The motivation is to track the health of sablefish population. 
 
+## Program Description
+[insert table with images of 1. downloads and construct image of sonar data 2. detects and tracks fish ]
+[insert table with images  of 3. processes image and skeletonizes to find most accurate length]
+[ TODO 4. reports it via csv]
+
 ## TODO
 - Try FFIR instead of GMM bgs
 - Add 'download' and 'CSV generation' to program
@@ -26,7 +31,7 @@ Contains functions for creation of background subtracted frames
 
 **calc_length.py**
 
-Calculates the length of the fish given the largest bounding box from tracking
+Calculates the length of the fish given the largest view from tracking. Length is found using skeletonization.
 
 **main.py**
 
@@ -35,7 +40,7 @@ Runs full pipeline that creates constructed image, runs AI detection on, tracks 
 ### Scripts
 **download_ONC_data** (Step 1) [Made by Declan]
 
-Downloads sonar and video files from ONC data base using Alanna token.
+Downloads sonar and video files from ONC data base.
 
 [insert table of what is downloaded]
 
