@@ -4,7 +4,7 @@ import datetime
 import matplotlib.pyplot as plt
 from pymatreader import read_mat
 
-#
+
 def process_matfile(file_path, file_name):
     """
     Get that mat data and do file level calcs for later use
@@ -65,13 +65,13 @@ def process_matfile(file_path, file_name):
         'range'             : r,
         'theta'             : th,
         'dataMedian'        : np.median(acousticData,axis=(2)), # for bgs
-        # 'day'               : int(file_basename[(position+1):(position+3)]),  TODO put in correct one
+        # 'day'               : int(file_basename[(position+1):(position+3)]), TODO put in correct one
         'hour'              : int(file_basename[(position+1):(position+3)])
         })
     
     return didsonParams, acousticData
 
-# Done
+
 def get_date_and_time(frame, didsonParams):
 
     year = didsonParams['year'][0]
@@ -92,15 +92,16 @@ def get_date_and_time(frame, didsonParams):
     
     return frame_datetime
  
-# DONE
+
 def process_frame(frame, acousticData, didsonParams, bgs_write_path, frame_count):
 
     z_subtracted = np.subtract(acousticData[:,:,frame], didsonParams['dataMedian'])
     z_subtracted[z_subtracted<0]=0
     
     frame_timestamp = get_date_and_time(frame, didsonParams)
-
-    frame_write_path = os.path.join(bgs_write_path,f'{frame_timestamp}.Frame_{frame_count}.png')
+    
+    # :04d adds zero pad at beginning of numbers so they are in correct order
+    frame_write_path = os.path.join(bgs_write_path, f'{frame_timestamp}.Frame_{frame_count:04d}.png')
 
     create_image(z_subtracted, didsonParams['range'], didsonParams['theta'], frame_write_path)
     
@@ -108,7 +109,7 @@ def process_frame(frame, acousticData, didsonParams, bgs_write_path, frame_count
     
     return
 
-# DONE        
+       
 def  create_image(z, r, th, frame_path):
     """
     Creates png given data
