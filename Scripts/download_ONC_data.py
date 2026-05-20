@@ -8,7 +8,7 @@ import errno
 import math
 
 url = 'https://data.oceannetworks.ca/api/dataProductDelivery'
-token = '0d6776bd-e174-4817-931b-a7bdd5de2514'      # Alanna Token                            
+token =       # Alanna Token                            
 
 requestParameters = {'method':'request',
             'token':token,                              # replace YOUR_TOKEN_HERE with your personal token obtained from the 'Web Services API' tab at https://data.oceannetworks.ca/Profile when logged in.
